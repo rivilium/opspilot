@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OpsPilot AI — The operating system for modern businesses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0A0B0F;color:#F1F2F5;font-family:'Inter',sans-serif}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1E2028;border-radius:2px}
+  textarea{resize:vertical;font-family:'Inter',sans-serif}
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+const C = {
+  bg:"#0A0B0F", surface:"#111318", border:"#1E2028",
+  accent:"#6366F1", asoft:"#6366F115", amid:"#6366F140",
+  text:"#F1F2F5", muted:"#6B7280",
+  green:"#10B981", red:"#EF4444", yellow:"#F59E0B",
+};
+
+const NAV = [
+  {id:"dashboard",label:"Dashboard",icon:"⬛"},
+  {id:"analytics",label:"Analytics",icon:"📈"},
+  {id:"operations",label:"Operations",icon:"⚙️"},
+  {id:"people",label:"People",icon:"👥"},
+  {id:"finance",label:"Finance",icon:"💰"},
+  {id:"ai",label:"AI Tools",icon:"✦"},
+];
+
+// ── Primitives ────────────────────────────────────────────────────────
+function Card({children,style={},onClick}){
+  const [hov,setHov]=useState(false);
+  return <div onClick={onClick} onMouseEnter={()=>onClick&&setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{background:C.surface,border:`1px solid ${hov?C.amid:C.border}`,borderRadius:12,padding:"20px 24px",cursor:onClick?"pointer":"default",transition:"border-color 0.15s",...style}}>{children}</div>;
+}
+function Btn({children,onClick,variant="primary",style={},disabled}){
+  const v={primary:{background:C.accent,color:"#fff",border:"none"},ghost:{background:"transparent",color:C.muted,border:`1px solid ${C.border}`}};
+  return <button onClick={onClick} disabled={disabled}
+    style={{padding:"9px 18px",borderRadius:8,fontWeight:600,fontSize:13,cursor:disabled?"not-allowed":"pointer",transition:"all 0.15s",opacity:disabled?0.5:1,...v[variant],...style}}>{children}</button>;
+}
+function Lbl({children}){return <div style={{fontSize:11,fontWeight:600,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>{children}</div>;}
+function Inp({value,onChange,placeholder,type="text",style={}}){
+  return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+    style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 14px",color:C.text,fontSize:13,width:"100%",outline:"none",...style}}/>;
+}
+function Txta({value,onChange,placeholder,rows=4}){
+  return <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows}
+    style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 14px",color:C.text,fontSize:13,width:"100%",outline:"none"}}/>;
+}
+function SH({title,sub}){
+  return <div style={{marginBottom:24}}>
+    <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>{title}</h2>
+    {sub&&<p style={{color:C.muted,fontSize:13,marginTop:4}}>{sub}</p>}
+  </div>;
+}
+function Badge({label,color}){
+  return <span style={{background:(color||C.accent)+"20",color:color||C.accent,fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20}}>{label}</span>;
+}
+
+// ── AI Modal ──────────────────────────────────────────────────────────
+function AIModal({title,systemPrompt,userPrefix,fields,onClose}){
+  const [vals,setVals]=useState({});
+  const [result,setResult]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  async function generate(){
+    setLoading(true);setResult("");
+    const userMsg=userPrefix+"\n"+fields.map(f=>`${f.label}: ${vals[f.key]||""}`).join("\n");
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,system:systemPrompt,messages:[{role:"user",content:userMsg}]})
+      });
+      const d=await res.json();
+      setResult(d.content?.[0]?.text||"Error generating content.");
+    }catch{setResult("Network error. Please try again.");}
+    setLoading(false);
+  }
+
+  return <div style={{position:"fixed",inset:0,background:"#000a",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:16,width:"100%",maxWidth:620,maxHeight:"90vh",overflowY:"auto",padding:32}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+        <h3 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700}}>{title}</h3>
+        <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:20}}>✕</button>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {fields.map(f=><div key={f.key}>
+          <Lbl>{f.label}</Lbl>
+          {f.type==="textarea"
+            ?<Txta value={vals[f.key]||""} onChange={v=>setVals(p=>({...p,[f.key]:v}))} placeholder={f.placeholder} rows={3}/>
+            :<Inp value={vals[f.key]||""} onChange={v=>setVals(p=>({...p,[f.key]:v}))} placeholder={f.placeholder}/>}
+        </div>)}
+        <Btn onClick={generate} disabled={loading}>{loading?"Generating…":"✦ Generate"}</Btn>
+        {result&&<div style={{marginTop:8}}>
+          <Lbl>Result</Lbl>
+          <div style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 16px",fontSize:13,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{result}</div>
+          <Btn variant="ghost" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(result)}>Copy to clipboard</Btn>
+        </div>}
+      </div>
+    </div>
+  </div>;
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────
+function Dashboard({setPage}){
+  const kpis=[
+    {label:"Monthly Revenue",value:"$48,200",delta:"+6%",up:true},
+    {label:"Labour %",value:"31%",delta:"+2%",up:false},
+    {label:"Open Tasks",value:"12",delta:"3 overdue",up:false},
+    {label:"Productivity Score",value:"74/100",delta:"+4pts",up:true},
+    {label:"Cost Savings ID'd",value:"$3,100",delta:"this month",up:true},
+    {label:"Active Staff",value:"18",delta:"2 on leave",up:true},
+  ];
+  const insights=[
+    {text:"Labour costs increased 12% this month vs last month.",sev:"red"},
+    {text:"Revenue up 6% but expenses up 15% — review supplier costs.",sev:"yellow"},
+    {text:"Team productivity dropped 8% in week 3. Consider schedule review.",sev:"yellow"},
+    {text:"3 SOPs have not been reviewed in 90+ days.",sev:"red"},
+    {text:"Onboarding checklist completion rate is 91% — above benchmark.",sev:"green"},
+  ];
+  const actions=[
+    {label:"Generate SOP",page:"operations"},{label:"Create Job Description",page:"people"},
+    {label:"Review Expenses",page:"finance"},{label:"Run SWOT Analysis",page:"ai"},
+    {label:"Build KPI Plan",page:"ai"},{label:"Improve a Process",page:"ai"},
+  ];
+  return <div>
+    <div style={{marginBottom:28}}>
+      <h1 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:26,fontWeight:700}}>Good morning ✦</h1>
+      <p style={{color:C.muted,fontSize:14,marginTop:4}}>Here's what's happening in your business today.</p>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12,marginBottom:24}}>
+      {kpis.map(k=><Card key={k.label}>
+        <Lbl>{k.label}</Lbl>
+        <div style={{fontSize:26,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",margin:"6px 0"}}>{k.value}</div>
+        <span style={{fontSize:12,color:k.up?C.green:C.red}}>{k.delta}</span>
+      </Card>)}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <Card>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+          <span style={{color:C.accent,fontSize:16}}>✦</span>
+          <span style={{fontWeight:600,fontSize:14}}>AI Insights</span>
+          <Badge label="Live" color={C.green}/>
+        </div>
+        {insights.map((ins,i)=><div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10}}>
+          <div style={{width:6,height:6,borderRadius:3,background:{red:C.red,yellow:C.yellow,green:C.green}[ins.sev],marginTop:5,flexShrink:0}}/>
+          <p style={{fontSize:13,lineHeight:1.5}}>{ins.text}</p>
+        </div>)}
+      </Card>
+      <Card>
+        <div style={{fontWeight:600,fontSize:14,marginBottom:16}}>Quick Actions</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {actions.map(a=><button key={a.label} onClick={()=>setPage(a.page)}
+            style={{background:C.asoft,border:`1px solid ${C.amid}`,color:C.text,borderRadius:8,padding:"10px 12px",fontSize:12,fontWeight:500,cursor:"pointer",textAlign:"left"}}>{a.label}</button>)}
+        </div>
+      </Card>
+    </div>
+  </div>;
+}
+
+// ── Analytics ─────────────────────────────────────────────────────────
+function Analytics(){
+  const [data,setData]=useState({revenue:"",expenses:"",labour:"",staff:"",customers:"",transactions:""});
+  const [report,setReport]=useState(null);
+  const [loading,setLoading]=useState(false);
+  async function analyze(){
+    setLoading(true);setReport(null);
+    const prompt=`You are a business analytics AI. Given these metrics, produce: 1) Key observations, 2) Profitability analysis, 3) Operational health score /100, 4) Three specific recommendations.\n\nRevenue: $${data.revenue} | Expenses: $${data.expenses} | Labour: $${data.labour} | Staff: ${data.staff} | Customers: ${data.customers} | Transactions: ${data.transactions}`;
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+      const d=await res.json();setReport(d.content?.[0]?.text||"Error.");
+    }catch{setReport("Network error.");}
+    setLoading(false);
+  }
+  const fields=[
+    {key:"revenue",label:"Monthly Revenue ($)"},{key:"expenses",label:"Total Expenses ($)"},
+    {key:"labour",label:"Labour Costs ($)"},{key:"staff",label:"Staff Count"},
+    {key:"customers",label:"Customer Count"},{key:"transactions",label:"Transactions"},
+  ];
+  return <div>
+    <SH title="Analytics" sub="Enter your numbers and get AI-powered recommendations."/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+      {fields.map(f=><Card key={f.key}><Lbl>{f.label}</Lbl><Inp value={data[f.key]} onChange={v=>setData(p=>({...p,[f.key]:v}))} placeholder="0" type="number"/></Card>)}
+    </div>
+    <Btn onClick={analyze} disabled={loading}>{loading?"Analyzing…":"✦ Analyze My Business"}</Btn>
+    {report&&<Card style={{marginTop:20}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+        <span style={{color:C.accent}}>✦</span><span style={{fontWeight:600}}>AI Business Report</span>
+      </div>
+      <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{report}</div>
+    </Card>}
+  </div>;
+}
+
+// ── Tool Page Factory ─────────────────────────────────────────────────
+function ToolPage({title,sub,tools}){
+  const [modal,setModal]=useState(null);
+  return <div>
+    <SH title={title} sub={sub}/>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
+      {tools.map(t=><Card key={t.id} onClick={()=>setModal(t)}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+          <div style={{fontWeight:600,fontSize:14}}>{t.label}</div>
+          <span style={{color:C.accent,fontSize:13}}>✦</span>
+        </div>
+        <p style={{fontSize:13,color:C.muted,lineHeight:1.5}}>{t.desc}</p>
+        <div style={{marginTop:14,color:C.accent,fontSize:12,fontWeight:600}}>Open →</div>
+      </Card>)}
+    </div>
+    {modal&&<AIModal {...modal} title={modal.label} onClose={()=>setModal(null)}/>}
+  </div>;
+}
+
+const OPS_TOOLS=[
+  {id:"sop",label:"SOP Generator",desc:"Create step-by-step standard operating procedures for any process.",
+   system:"You are an operations expert. Generate a detailed, professional SOP with numbered steps, responsible parties, and key checkpoints.",
+   userPrefix:"Generate an SOP for:",
+   fields:[{key:"process",label:"Process Name",placeholder:"e.g. Opening Procedure, Customer Complaint Handling"},{key:"industry",label:"Industry",placeholder:"e.g. Retail, Hospitality"},{key:"details",label:"Key Details",placeholder:"Specific steps or requirements…",type:"textarea"}]},
+  {id:"checklist",label:"Process Checklist",desc:"Build actionable checklists for recurring tasks.",
+   system:"You are an operations expert. Create a practical numbered checklist grouped into logical phases.",
+   userPrefix:"Create a checklist for:",
+   fields:[{key:"process",label:"Process",placeholder:"e.g. New client onboarding"},{key:"team",label:"Who completes it",placeholder:"e.g. Store manager"},{key:"freq",label:"Frequency",placeholder:"e.g. Daily, Weekly"}]},
+  {id:"risk",label:"Risk Register",desc:"Identify operational risks and corrective actions.",
+   system:"You are a risk management expert. Create a structured risk register with Risk ID, Description, Likelihood, Impact, Rating, and Mitigation.",
+   userPrefix:"Create a risk register for:",
+   fields:[{key:"biz",label:"Business Type",placeholder:"e.g. Café, Construction firm"},{key:"area",label:"Area of Focus",placeholder:"e.g. Operations, Safety, Finance"}]},
+  {id:"incident",label:"Incident Report",desc:"Document workplace incidents formally.",
+   system:"You are an operations manager. Create a formal incident report with: summary, root cause, immediate actions, and corrective measures.",
+   userPrefix:"Create an incident report:",
+   fields:[{key:"incident",label:"What happened",placeholder:"Describe the incident…",type:"textarea"},{key:"date",label:"Date & Location",placeholder:"e.g. 12 June 2026, Warehouse B"},{key:"people",label:"People involved (roles)",placeholder:"e.g. Supervisor, two team members"}]},
+];
+
+const PEOPLE_TOOLS=[
+  {id:"jd",label:"Job Description Generator",desc:"Write compelling, complete job descriptions.",
+   system:"You are an HR expert. Write a professional job description with: Overview, Responsibilities, Requirements, and What We Offer.",
+   userPrefix:"Generate a job description for:",
+   fields:[{key:"role",label:"Job Title",placeholder:"e.g. Operations Manager, Barista"},{key:"industry",label:"Industry & Company Type",placeholder:"e.g. Fast casual restaurant"},{key:"req",label:"Key Requirements",placeholder:"Experience, skills…",type:"textarea"}]},
+  {id:"interview",label:"Interview Questions",desc:"Generate role-specific interview question sets.",
+   system:"You are an HR specialist. Create: 5 behavioural, 5 technical, 3 culture-fit, and 2 scenario questions with what to listen for.",
+   userPrefix:"Create interview questions for:",
+   fields:[{key:"role",label:"Role",placeholder:"e.g. Customer service manager"},{key:"values",label:"Company Values / Culture",placeholder:"e.g. Fast-paced, customer-first"}]},
+  {id:"onboard",label:"Onboarding Plan",desc:"Build a 30/60/90 day plan for new starters.",
+   system:"You are an HR expert. Create a 30/60/90-day onboarding plan with milestones, tasks, and success criteria per phase.",
+   userPrefix:"Create an onboarding plan for:",
+   fields:[{key:"role",label:"Role",placeholder:"e.g. Retail team leader"},{key:"team",label:"Team Size & Structure",placeholder:"e.g. 8-person team"},{key:"goals",label:"Key Priorities in First 90 Days",placeholder:"What must they achieve?",type:"textarea"}]},
+  {id:"review",label:"Performance Review",desc:"Structure fair, productive performance conversations.",
+   system:"You are an HR expert. Create a performance review template with: self-assessment, manager assessment, highlights, development areas, SMART goals.",
+   userPrefix:"Create a performance review for:",
+   fields:[{key:"role",label:"Role Being Reviewed",placeholder:"e.g. Sales Associate"},{key:"period",label:"Review Period",placeholder:"e.g. Annual, 6-month probation"},{key:"focus",label:"Key Focus Areas",placeholder:"e.g. Customer service, targets"}]},
+];
+
+const FINANCE_TOOLS=[
+  {id:"cost",label:"Cost Reduction Advisor",desc:"Identify where your business is leaking money.",
+   system:"You are a financial advisor for SMBs. Identify top 3 cost reduction areas with specific steps, savings potential, and quick wins vs long-term changes.",
+   userPrefix:"Analyze expenses and find cost reduction opportunities:",
+   fields:[{key:"expenses",label:"Expense Breakdown",placeholder:"e.g. Rent $4k, Staff $12k, Inventory $6k…",type:"textarea"},{key:"revenue",label:"Monthly Revenue",placeholder:"e.g. $35,000"},{key:"challenge",label:"Biggest Cost Challenge",placeholder:"What's hurting margins most?"}]},
+  {id:"budget",label:"Budget Template Builder",desc:"Create a custom monthly budget framework.",
+   system:"You are a business finance expert. Create a detailed monthly budget template with cost categories, allocation percentages, and guidance notes.",
+   userPrefix:"Build a monthly budget for:",
+   fields:[{key:"type",label:"Business Type",placeholder:"e.g. Café with 6 staff"},{key:"revenue",label:"Expected Monthly Revenue",placeholder:"e.g. $25,000"},{key:"goals",label:"Financial Goals",placeholder:"e.g. Reduce labour to 28%"}]},
+  {id:"forecast",label:"Revenue Forecast",desc:"Project revenue with conservative, realistic, and optimistic scenarios.",
+   system:"You are a business growth strategist. Create a 6-month revenue forecast with 3 scenarios and key growth lever assumptions.",
+   userPrefix:"Create a 6-month revenue forecast:",
+   fields:[{key:"current",label:"Current Monthly Revenue",placeholder:"e.g. $42,000"},{key:"growth",label:"Recent Growth Trend",placeholder:"e.g. +5% per month"},{key:"plans",label:"Planned Changes",placeholder:"New product, extra staff, marketing…",type:"textarea"}]},
+];
+
+const AI_TOOLS=[
+  {id:"swot",label:"SWOT Analysis",desc:"Structured strengths, weaknesses, opportunities, and threats breakdown.",
+   system:"You are a business strategist. Produce a SWOT analysis with 4-5 points per quadrant, each with a strategic implication. End with 3 priorities.",
+   userPrefix:"Conduct a SWOT analysis for:",
+   fields:[{key:"biz",label:"Business Description",placeholder:"What you do, who for, and where?",type:"textarea"},{key:"goal",label:"Current Goal or Challenge",placeholder:"e.g. Trying to scale, launching a new product"}]},
+  {id:"kpi",label:"KPI Recommendation Engine",desc:"Get the right KPIs for your business type and goals.",
+   system:"You are a performance expert. Recommend 10-15 KPIs with name, formula, benchmark, and why it matters. Group by: Financial, Operational, People, Customer.",
+   userPrefix:"Recommend KPIs for:",
+   fields:[{key:"type",label:"Business Type",placeholder:"e.g. Retail store, Digital agency"},{key:"stage",label:"Business Stage & Goals",placeholder:"e.g. 3 years old, improving margins"},{key:"staff",label:"Staff Count",placeholder:"e.g. 12 full-time"}]},
+  {id:"process",label:"Process Improvement Analyzer",desc:"Find inefficiencies and get a redesign plan.",
+   system:"You are an operations consultant. Identify: top 3 bottlenecks, root causes, redesign steps, helpful tools, and expected outcomes.",
+   userPrefix:"Analyze and improve this process:",
+   fields:[{key:"process",label:"Current Process",placeholder:"Walk through each step…",type:"textarea"},{key:"problem",label:"Main Problem",placeholder:"e.g. Too slow, too many errors"}]},
+  {id:"bizplan",label:"Business Plan Generator",desc:"Build a structured, investor-ready business plan.",
+   system:"You are a business plan expert. Write: Executive Summary, Problem & Solution, Target Market, Value Proposition, Revenue Model, Key Milestones, Competitive Landscape.",
+   userPrefix:"Generate a business plan for:",
+   fields:[{key:"idea",label:"Business Idea",placeholder:"Describe your product or service",type:"textarea"},{key:"market",label:"Target Market",placeholder:"Who are your customers?"},{key:"revenue",label:"Revenue Model",placeholder:"How do you make money?"}]},
+  {id:"meeting",label:"Meeting Summary Generator",desc:"Turn rough notes into structured meeting summaries.",
+   system:"You are an executive assistant. Convert notes into: Meeting Overview, Key Decisions, Action Items (with owner + deadline), Discussion Points, Next Steps.",
+   userPrefix:"Summarize these meeting notes:",
+   fields:[{key:"notes",label:"Raw Meeting Notes",placeholder:"Paste your notes here…",type:"textarea"},{key:"attendees",label:"Attendees / Roles",placeholder:"e.g. CEO, Ops Manager, 2x Team Leads"}]},
+  {id:"policy",label:"Policy Generator",desc:"Create professional workplace policies instantly.",
+   system:"You are an HR and compliance expert. Write a policy with: Title, Purpose, Scope, Policy Statement, Procedures (numbered), Responsibilities, Review Date.",
+   userPrefix:"Create a workplace policy for:",
+   fields:[{key:"policy",label:"Policy Topic",placeholder:"e.g. Social media, Remote work, Leave"},{key:"industry",label:"Industry",placeholder:"e.g. Healthcare, Retail"},{key:"size",label:"Team Size",placeholder:"e.g. 15 employees"}]},
+];
+
+// ── App Shell ─────────────────────────────────────────────────────────
+export default function App(){
+  const [page,setPage]=useState("dashboard");
+  const [open,setOpen]=useState(true);
+
+  const pages={
+    dashboard:<Dashboard setPage={setPage}/>,
+    analytics:<Analytics/>,
+    operations:<ToolPage title="Operations" sub="Build SOPs, checklists, and risk tools instantly." tools={OPS_TOOLS}/>,
+    people:<ToolPage title="People" sub="Hire better, onboard faster, and develop your team." tools={PEOPLE_TOOLS}/>,
+    finance:<ToolPage title="Finance" sub="Control costs, build budgets, and grow profitably." tools={FINANCE_TOOLS}/>,
+    ai:<ToolPage title="AI Tools" sub="Instant value. Pick a tool and get results in seconds." tools={AI_TOOLS}/>,
+  };
+
+  return <>
+    <div style={{display:"flex",minHeight:"100vh",background:C.bg}}>
+      {/* Sidebar */}
+      <div style={{width:open?220:60,flexShrink:0,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",transition:"width 0.2s",overflow:"hidden"}}>
+        <div style={{padding:open?"24px 20px 20px":"24px 14px 20px",borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:30,height:30,background:C.accent,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>✦</div>
+            {open&&<span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:15}}>OpsPilot AI</span>}
+          </div>
+        </div>
+        <nav style={{flex:1,padding:"12px 10px"}}>
+          {NAV.map(n=>{
+            const active=page===n.id;
+            return <button key={n.id} onClick={()=>setPage(n.id)} style={{
+              display:"flex",alignItems:"center",gap:10,width:"100%",
+              padding:"9px 10px",borderRadius:8,border:"none",cursor:"pointer",
+              background:active?C.asoft:"transparent",color:active?C.accent:C.muted,
+              fontWeight:active?600:400,fontSize:13,marginBottom:2,
+              transition:"all 0.15s",textAlign:"left",
+            }}>
+              <span style={{fontSize:15,flexShrink:0}}>{n.icon}</span>
+              {open&&<span>{n.label}</span>}
+            </button>;
+          })}
+        </nav>
+        <button onClick={()=>setOpen(o=>!o)} style={{margin:"12px 10px",padding:"8px 10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,color:C.muted,cursor:"pointer",fontSize:12,fontFamily:"Inter,sans-serif"}}>
+          {open?"← Collapse":"→"}
+        </button>
+      </div>
+      {/* Main */}
+      <div style={{flex:1,padding:"32px 36px",overflowY:"auto",maxWidth:960}}>
+        {pages[page]}
+      </div>
+    </div>
+  </>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
